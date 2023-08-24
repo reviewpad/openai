@@ -1,0 +1,56 @@
+extends:
+  - https://github.com/reviewpad/.github/blob/main/reviewpad-models/common.yml
+
+labels:
+  external-contribution:
+    description: External contribution
+    color: "#8a2151"
+  plugins:
+    description: Modifications to the plugins directory
+    color: "#294b72"
+  critical:
+    description: Modifications to critical changes
+    color: "#294b75"
+
+groups:
+  - name: owners
+    description: Group of owners
+    kind: developers
+    spec: '["ferreiratiago", "marcelosousa"]'
+
+  - name: maintainers
+    description: Official maintainers
+    spec: '["marcelosousa", "ferreiratiago", "shay2025", "zolamk"]'
+
+rules:
+  # This rule is used to block pull request from being merged.
+  # It is used on extended reviewpad common.yml configuration.
+  - name: should block pull request
+    description: The pull request should be blocked
+    spec: $isElementOf("do-not-merge", $labels()) || !$isElementOf($author(), $group("maintainers")) || $hasFileName("LICENSE")
+
+workflows:
+  - name: external contribution
+    run:
+      - if: '!$isElementOf($author(), $group("maintainers"))'
+        then:
+          - $addLabel("external-contribution")
+          - if: $author() != "renovate"
+            then: $info($sprintf("@%s thanks for your contribution!", [$author()]))
+
+pipelines:
+  - name: license
+    description: Pull request that touches the LICENSE file
+    trigger: $hasFileName("LICENSE")
+    stages:
+      - actions:
+          - $error("Sorry, you are not authorized to make these changes")
+          - $close()
+        until: $isElementOf($author(), $group("owners"))
+      - actions:
+          - $error("You are changing more than the LICENSE file. Pull request that change the LICENSE file should only modify the LICENSE file.")
+          - $close()
+        until: $fileCount() == 1
+      - actions:
+          - $addLabel("modifies-license")
+          - $assignReviewer($group("owners"), 1)
